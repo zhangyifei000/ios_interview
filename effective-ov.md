@@ -214,3 +214,118 @@ typedef NS_ENUM(NSInteger, UIViewAnimationCurve) {
 
     //如果将上面的copy改成strong的话，打印的就是Bill12;
     ```
+
+### 对象内部尽量直接访问实例变量
+
+对象之外访问实例变量总是通过属性来做，在对象内部访问实例变量的时候应该读取实例变量采用直接读取的方式，设置实例变量的时候通过属性来做。
+
+1. 不经过方法派发步骤，所以直接访问速度比较快。
+2. 绕过了设置方法所定义的内存管理语义。
+3. 直接访问不会触发键值观测通知。
+4. 通过属性来访问可以在get 和 set 方法里debug,方便调试。
+
+在写入实例变量 的时候应该通过设置方法来做，在读取实例变量的时候应该通过直接读取的方式。这样既能提高读取效率，又能控制属性的写入操作，但是在初始化方法中要使用直接设置的方式，不能通过设置方法，因为子类可能复写了设置方法。另外一个就是懒加载的时候要通过获取方法来获取，不然就不会初始化了。
+
+```Object-C
+- （NSArray *)array {
+    if(_array) {
+        _array = @[];
+    }
+    return _array
+}
+```
+
+### 对象的等同性
+
+如何判断两个对象是否相等，当然类型不同两个对象肯定是不相等的。地址相同的两个对象肯定是相等的。==操作符只能用来比较地址是否相等。
+
+```Object-C
+    NSString *name1 = @"Bill";
+    NSString *name2 = [NSString stringWithFormat:@"%@", @"Bill"];
+    
+    NSLog(@"%d", name1 == name2); //0
+    NSLog(@"%d", [name1 isEqualToString:name2]); //1
+```
+
+对于字符串来说我们如果认为两个值相等那么这两个字符串就相等。调用该方法比调用isEqual方法块，因为isEqual不知道调用类型，还要执行额外的步骤去检测对像类型。
+加入我们有个需求，两个人名相同我们就认为这两个人事同一个人，我们该如何进行比较。
+
+```Object-C
+- (BOOL)isEqualToPersion:(Person *)person
+{
+    if ([person.name isEqualToString: _name]) {
+        return YES;
+    }
+    return NO;
+}
+
+- (BOOL)isEqual:(id)other
+{
+    if (other == self) {
+        return YES;
+    } else if (![super isEqual:other]) {
+        return NO;
+    } else {
+        return [self isEqualToPersion:other];
+    }
+}
+
+
+- (NSUInteger)hash
+{
+    return [_name hash];
+}
+```
+
+两个对象相等那么这两个对象的hash值也是相等的。但是两个hash值相等的对象却未必相等。但是如果把每个对象的hash值都是一样的话在集合中这种对象是会产生性能问题的。所以一般我们使用能唯一识别这个对象的值来做hash值比如数据库中的主键。
+
+#### 容器中可变类的等同性
+
+我们看个例子
+
+```Object-C
+    NSMutableSet *set = [NSMutableSet set];
+    NSMutableArray *arrayA = [@[@1,@2] mutableCopy];
+    [set addObject:arrayA];
+    
+    NSLog(@"%@", set);
+    
+    NSMutableArray *arrayB = [@[@1] mutableCopy];
+    [set addObject:arrayB];
+    
+    NSLog(@"%@", set);
+    
+    [arrayB addObject:@2];
+    
+    NSLog(@"%@", set);
+
+
+2017-12-28 14:28:05.650216+0800 Effective-Objective-C[6858:410879] {(
+        (
+        1,
+        2
+    )
+)}
+2017-12-28 14:28:05.650536+0800 Effective-Objective-C[6858:410879] {(
+        (
+        1
+    ),
+        (
+        1,
+        2
+    )
+)}
+2017-12-28 14:28:05.650682+0800 Effective-Objective-C[6858:410879] {(
+        (
+        1,
+        2
+    ),
+        (
+        1,
+        2
+    )
+)}
+
+```
+
+我们看到集合里存放了两条相同的数据，这当然是和集合的定义是矛盾的。
