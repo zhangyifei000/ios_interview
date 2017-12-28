@@ -150,3 +150,67 @@ typedef NS_ENUM(NSInteger, UIViewAnimationCurve) {
 ```
 
 我们看到了 NS\_ENUM 和 NS\_OPTIONS这些事Foundation框架中定义的一些辅助函数。
+
+
+### 理解属性这一概念
+
+对象是用来存储数据和进行操作的，在对象之间传递数据并且执行任务的过程叫做消息的传递。当程序运行起来后，Objective-C运行时为我们提供了一套可以使对象能够传递消息的重要函数。属性是Objective-C 的一项特性，用于封装数据。getter和setter方法分别用来读取数据和存储数据。使用@property进行定义，使用它进行标记的属性编译器会自动生成一套存取方法，此过程叫做自动合成。使用@dynamic关键字，他会告诉编译器不要自动创建实现属性所用的实例变量，也不要为为其创建存取方法。它相信在运行时期内找到，比如CoreData框架中的NSMangedObject类里创建一个自类，那么就需要在运行时期动态的创建存取方法。
+
+```Object-C
+
+@interface Person : NSManagedObjectModel
+@property NSString *name;
+@property NSInteger age;
+@end
+
+@implementation Person
+@dynamic name, age;
+@end
+
+```
+
+编译器不会为上面的这个类自动合成存取方法或者实例，访问属性也不会报错。
+
+#### 属性特质
+
+属性还有一些特质会影响存取方法的生成。
+
+```Object-C
+@property (nonatomic, readonly, copy) NSString *firstName;
+```
+
+属相可以拥有的特质分为四类：
+
+1. 原子性
+    如果你是nonatomic的特质，就不会使用同步锁。
+
+2. assign 
+    设置方法只针对值类型的。
+3. strong
+    拥有关系，为这种属性设置的时候是先保留新值并释放旧值，让后将新值释放上去
+4. weak 表示非拥有关系设置方法是既不保留新值，也不释放旧值和assign差不多，属性所指对象摧毁时属性值也会清空
+
+5. unsafe_unretained 
+    非拥有关系，适用于对象类型，对象摧毁了属性也不会自动清空。不安全的
+
+6. copy
+    不保留新值而是将其copy一份，当属性是NSString*时经常用此特质来保护其封装性。只要实现属性是可变的，就应该设置新属性值是拷贝一份。
+
+    ```Object-C
+    @interface Person : NSObject
+    @property(nonatomic, copy) NSString *name;
+    @end
+
+
+    Person *p = [Person new];
+    NSMutableString *string = [NSMutableString stringWithFormat:@"Bill"];
+    
+    p.name = string;
+    
+    [string appendString:@"12"]; //修改了string
+    
+    NSLog(@"%@", p.name); //Bill
+
+
+    //如果将上面的copy改成strong的话，打印的就是Bill12;
+    ```
